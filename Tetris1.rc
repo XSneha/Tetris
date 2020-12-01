@@ -1,0 +1,10 @@
+#include "MyIcon.h"
+
+MYICON ICON res/app.ico
+PINK_TILE BITMAP res/tile_purple.bmp
+RED_TILE BITMAP res/tile_red.bmp
+YELLOW_TILE BITMAP res/tile_yellow.bmp
+ORANGE_TILE BITMAP res/tile_orange.bmp
+GREEN_TILE BITMAP res/tile_green.bmp
+CYAN_TILE BITMAP res/tile_cyan.bmp
+BLUE_TILE BITMAP res/tile_blue.bmp
