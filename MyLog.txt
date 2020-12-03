@@ -1,0 +1,113 @@
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+adding shape to list
+list is empty 
+entered 1st element in list 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+adding shape to list
+list is not empty 
+list is not empty 
+list is not empty 
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+adding shape to list
+list is not empty 
+list is not empty 
+list is empty 
+list is not empty 
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+falling
+adding shape to list
+list is not empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is not empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+falling
+falling
+falling
+falling
+falling
+falling
+adding shape to list
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+falling
+falling
+adding shape to list
+list is not empty 
+list is empty 
+list is not empty 
+list is empty 
+Log fileClosed successfully 

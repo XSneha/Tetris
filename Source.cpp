@@ -6,33 +6,34 @@
 #include<GL/glu.h>
 #include <time.h>
 #include "MyIcon.h"
-
 //#pragma once
 #define MYICON 101
-
 #pragma comment(lib,"OpenGl32.lib")
 #pragma comment(lib,"GLU32.lib")
-
-#define WIN_WIDTH 1300
-#define WIN_HEIGHT 737
-
-GLfloat win_width = WIN_WIDTH;
-GLfloat win_height = WIN_HEIGHT;
-
+#pragma comment(lib,"Winmm.lib")
 //shapes
 #define SQUARE 0
 #define DOT 1
 #define LINE 2
-#define L 3
-#define T 4
+#define T 3
+#define L 4
 #define Z 5
 
-//vertical and horizontal
-//#define V 15
-//#define H 10
-
-GLfloat angle = 0.00f;
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+
+//windowing variables
+HWND ghwnd;
+WINDOWPLACEMENT wpPrev = { sizeof(WINDOWPLACEMENT) };
+DWORD dwStyle;
+FILE* gpFile = NULL;
+bool gbActive = false;
+bool gbFscreen = false;
+HDC ghdc = NULL;
+HGLRC ghrc = NULL;
+GLfloat win_width = 1300;
+GLfloat win_height = 737;
+
+//texture variables
 GLuint pink_texture;
 GLuint red_texture;
 GLuint yellow_texture;
@@ -40,19 +41,10 @@ GLuint orange_texture;
 GLuint green_texture;
 GLuint cyan_texture;
 GLuint blue_texture;
-
-HWND ghwnd;
-WINDOWPLACEMENT wpPrev = { sizeof(WINDOWPLACEMENT) };
-DWORD dwStyle;
-FILE* gpFile = NULL;
-bool gbActive = false;
-bool gbFscreen = false;
-
-HDC ghdc = NULL;
-HGLRC ghrc = NULL;
+//font
+GLuint nFontList = 0;
 
 //tatris variables
-
 bool falling = false;
 
 //game grid properties
@@ -78,7 +70,7 @@ GLfloat shapeWidth = 0.5f;
 GLfloat shapeHeight = 0.5f;
 GLfloat shapeAngle = 0.0f;
 int rotation = 0;
-
+int delayms = 400;
 //array of shape[width,height]
 GLfloat square[2] = { 0.5f , 0.5f };
 GLfloat dot[2] = { 0.25f,0.25f };
@@ -86,29 +78,27 @@ GLfloat ln[2] = { 0.25f,0.75f };
 GLfloat l[2] = { 0.5f , 0.5f };
 GLfloat t[2] = { 0.5f , 0.5f };
 
+//linked list node to store setteled pieces
 struct node {
 	int data[10];
 	struct node* next;
 };
-
 struct node* list = NULL;
 
 //to identify the column 
 int x = 4;
 
-//font
-GLuint nFontList = 0;
-
 //score
 int level = 0, score = 0;
-
 bool over = false;
+bool started = false;
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpStrCmd, int iCmdShow) {
 	//function declerations
 	void Initialize(void);
 	void Display(void);
 	void update(void);
+	void ToggleFullScreen(void);
 
 	//variables
 	WNDCLASSEX wndclass;
@@ -149,10 +139,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpStrCmd, int iC
 		appName,
 		TEXT("Tetris"),
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE,
-		(swidth - WIN_WIDTH) / 2,
-		(sheight - WIN_HEIGHT) / 2,
-		WIN_WIDTH,
-		WIN_HEIGHT,
+		0,
+		0,
+		swidth,
+		sheight,
 		0,
 		0,
 		hInstance,
@@ -164,6 +154,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpStrCmd, int iC
 	Initialize();
 	SetForegroundWindow(hwnd);
 	SetFocus(hwnd);
+	//ToggleFullScreen();
+
 	//game loop
 	while (bDone == false) {
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -182,13 +174,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpStrCmd, int iC
 			}
 		}
 	}
-	return (msg.wParam);
+	return ((int)msg.wParam);
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	void ToggleFullScreen(void);
 	void Uninitialize(void);
 	void Resize(int width, int height);
+	void DeleteAllNodesofLinkedList();
+
+	bool sound = false;
+
 	switch (iMsg) {
 	case WM_SETFOCUS: gbActive = true;
 		break;
@@ -212,6 +208,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 				shapeAngle = 0.0f;
 			}
 			break;
+		case 'Y':
+		case 'y':
+			if (over == true) {
+				over = false;
+				DeleteAllNodesofLinkedList();
+				started = false;
+				for (int i = 0; i < 10; i++) {
+					bot[i] = -7 * 0.05f;
+				}
+			}
+			break;
+		case 'N':
+		case 'n':
+			if (over == true) {
+				DestroyWindow(hwnd);
+			}
+			break;
 		case 'R' :
 		case 'r':
 			rotation++;
@@ -231,6 +244,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 				shapePositionX = shapePositionX + 0.05f;
 				x++;
 			}
+			break;
+		case's':
+		case 'S':
+			sound = PlaySound(MAKEINTRESOURCE(MYWAVE), GetModuleHandle(NULL), SND_LOOP|SND_RESOURCE | SND_ASYNC);
+			if (sound == false) {
+				MessageBox(NULL, TEXT("PlaySound failed"), TEXT("ERROR"), MB_OK);
+				return (0);
+			}
+			started = true;
 			break;
 		case VK_ESCAPE: DestroyWindow(hwnd);
 			break;
@@ -271,8 +293,8 @@ void ToggleFullScreen(void) {
 		ShowCursor(false);
 	}
 	else {
-		win_width = WIN_WIDTH;
-		win_height = WIN_HEIGHT;
+		//win_width = WIN_WIDTH;
+		//win_height = WIN_HEIGHT;
 		ShowCursor(true);
 		SetWindowLong(ghwnd, GWL_STYLE, dwStyle);
 		SetWindowPlacement(ghwnd, &wpPrev);
@@ -374,7 +396,7 @@ void Initialize(void) {
 	LoadGLTexture(&blue_texture, MAKEINTRESOURCE(BLUE_TILE));
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	Resize(WIN_WIDTH, WIN_HEIGHT);
+	Resize(win_width, win_height);
 }
 
 bool LoadGLTexture(GLuint* texture, TCHAR resourceId[]) {
@@ -447,20 +469,23 @@ void Display(void) {
 		glEnd();
 	}
 
-	RandomFallingShape();
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glColor3f(1.0f, 1.0f, 1.0f);
+	if (started) {
+		RandomFallingShape();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glColor3f(1.0f, 1.0f, 1.0f);
 
-	DrawSettledPixels();
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glColor3f(1.0f, 1.0f, 1.0f);
-
+		DrawSettledPixels();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glColor3f(1.0f, 1.0f, 1.0f);
+	}
+	
 	glViewport((GLint)(win_width /1.54) , (GLint)0, (GLsizei)(win_width / 3.5), (GLsizei)win_height);
 	DrawInstructionBoard();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glColor3f(1.0f, 1.0f, 1.0f);
-
-	update();
+	if (started) {
+		update();
+	}
 	SwapBuffers(ghdc);
 }
 
@@ -468,7 +493,7 @@ void DrawInstructionBoard() {
 	void drawShapeWithHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight);
 	void drawLShapeHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight);
 
-	GLfloat shapeWidth, shapeHeight , instructionY=0.0f ;
+	GLfloat instructionY=0.0f ;
 	glLoadIdentity();
 	glTranslatef(0.0f, 0.0f, -1.0f);
 	glBegin(GL_QUADS);
@@ -480,7 +505,7 @@ void DrawInstructionBoard() {
 	glEnd();
 
 	glLoadIdentity();
-	glTranslatef(-0.55f, top - 0.1, -1.0f);
+	glTranslatef(-0.55f, top - 0.1f, -1.0f);
 
 	glColor3f(0.0f,0.0f,0.1f);
 	glRasterPos3f(0.3f, 0.0f, 0.0f);
@@ -489,7 +514,13 @@ void DrawInstructionBoard() {
 	instructionY -= 0.05f;
 	instructionY -= 0.05f;
 	glRasterPos3f(0.0f, instructionY, 0.0f);
-	glCallLists(25, GL_UNSIGNED_BYTE, "Press 'F' For Full Screen");
+	glCallLists(25, GL_UNSIGNED_BYTE, "Press 'S' to Start");
+	instructionY -= 0.05f;
+	glRasterPos3f(0.0f, instructionY, 0.0f);
+	glCallLists(25, GL_UNSIGNED_BYTE, "'F' to toggle Full Screen");
+	instructionY -= 0.05f;
+	glRasterPos3f(0.0f, instructionY, 0.0f);
+	glCallLists(15, GL_UNSIGNED_BYTE, "'Esc' to Escape");
 	instructionY -= 0.05f;
 	glRasterPos3f(0.0f, instructionY, 0.0f);
 	glCallLists(36, GL_UNSIGNED_BYTE, "Right arrow key to move right");
@@ -506,8 +537,7 @@ void DrawInstructionBoard() {
 
 void DrawNextShape() {
 	void drawShapeWithHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight);
-	void drawLShapeHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight);
-
+	void drawShapeT();
 	GLfloat shapeWidth, shapeHeight, instructionY = 0.0f;
 	char *sscore;
 	char *slevel;
@@ -530,7 +560,7 @@ void DrawNextShape() {
 	glVertex3f(0.45f, top - 0.02f, 0.0f);
 	glEnd();
 
-	if (over == false) {
+	if (over == false && started == true) {
 		glLoadIdentity();
 		//glViewport(0, 0, win_width /4, win_height);
 		glTranslatef(0, top - 0.11f, -1.0f);
@@ -556,16 +586,14 @@ void DrawNextShape() {
 			glBindTexture(GL_TEXTURE_2D, cyan_texture);
 			drawShapeWithHeightAndWidth(shapeWidth, shapeHeight, 1.0f, 3.0f);
 		}
-		else if (L == nextShape) {
+		else if (T == nextShape) {
 			glColor3f(0.0f, 1.0f, 1.0f);
-			shapeWidth = shapeWidth = square[0];
-			shapeHeight = ln[1];
 			glBindTexture(GL_TEXTURE_2D, orange_texture);
-			drawLShapeHeightAndWidth(shapeWidth, shapeHeight, 2.0f, 3.0f);
+			drawShapeT();
 		}
 	}
 	glLoadIdentity();
-	glTranslatef(-0.60f, top - 0.3, -1.0f);
+	glTranslatef(-0.60f, top - 0.3f, -1.0f);
 	glColor3f(0.0f, 0.0f, 0.1f);
 	glListBase(nFontList);
 	if (over == false) {
@@ -600,11 +628,16 @@ void DrawNextShape() {
 	glRasterPos3f(0.55f, instructionY, 0.0f);
 	glCallLists(4, GL_UNSIGNED_BYTE, sscore);
 
+	if (over == true) {
+		instructionY -= 0.05f;
+		glRasterPos3f(0.05f, instructionY, 0.0f);
+		glCallLists(32, GL_UNSIGNED_BYTE, "You want to play again : 'Y'?'N'");
+	}
 }
 
 void RandomFallingShape() {
 	void drawShapeWithHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight);
-	void drawLShapeHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight);
+	void drawShapeT();
 	glLoadIdentity();
 	glTranslatef(shapePositionX, shapePositionY, -1.0f);
 	glRotatef(shapeAngle,0.0f,0.0f,1.0f);
@@ -622,29 +655,57 @@ void RandomFallingShape() {
 		glBindTexture(GL_TEXTURE_2D, cyan_texture);
 		drawShapeWithHeightAndWidth(shapeWidth, shapeHeight, 1.0f, 3.0f);
 	}
-	else if (L == nextShape) {
+	else if (T == currentShape) {
 		glColor3f(0.0f, 1.0f, 1.0f);
-		shapeWidth = shapeWidth = square[0];
-		shapeHeight = ln[1];
 		glBindTexture(GL_TEXTURE_2D, orange_texture);
-		drawLShapeHeightAndWidth(shapeWidth, shapeHeight, 2.0f, 3.0f);
+		drawShapeT();
 	}
 }
 
-void drawLShapeHeightAndWidth(GLfloat shapeWidth, GLfloat shapeHeight, GLfloat textureWidth, GLfloat textureHeight) {
+void drawShapeT(){
+	//middle pixel
 	glBegin(GL_QUADS);
-	glTexCoord2d(0.0f, textureHeight);
-	glVertex3f(-shapeWidth, shapeHeight, 0.0f);
+	glTexCoord2d(0.0f, 1.0f);
+	glVertex3f(-dot[0], dot[1], 0.0f);
 	glTexCoord2d(0.0f, 0.0f);
-	glVertex3f(-shapeWidth, -shapeHeight, 0.0f);
-	glTexCoord2d(textureWidth, 0.0f);
-	glVertex3f(shapeWidth, -shapeHeight, 0.0f);
-	glTexCoord2d(textureWidth, textureHeight);
-	glVertex3f(shapeWidth, -(2 * shapeHeight) / 3, 0.0f);
-	glTexCoord2d(textureWidth, textureHeight);
-	glVertex3f(0.0f, -(2*shapeHeight)/ 3, 0.0f);
-	glTexCoord2d(textureWidth, textureHeight);
-	glVertex3f(0.0f,  shapeHeight, 0.0f);
+	glVertex3f(-dot[0], -dot[1], 0.0f);
+	glTexCoord2d(1.0f, 0.0f);
+	glVertex3f(dot[0], -dot[1], 0.0f);
+	glTexCoord2d(1.0f, 1.0f);
+	glVertex3f(dot[0], dot[1], 0.0f);
+	glEnd();
+	//left
+	glBegin(GL_QUADS);
+	glTexCoord2d(0.0f, 1.0f);
+	glVertex3f(-dot[0] - (dot[0]*2), dot[1], 0.0f);
+	glTexCoord2d(0.0f, 0.0f);
+	glVertex3f(-dot[0] - (dot[0] * 2), -dot[1], 0.0f);
+	glTexCoord2d(1.0f, 0.0f);
+	glVertex3f(dot[0] - (dot[0] * 2), -dot[1], 0.0f);
+	glTexCoord2d(1.0f, 1.0f);
+	glVertex3f(dot[0] - (dot[0] * 2), dot[1], 0.0f);
+	glEnd();
+	//right
+	glBegin(GL_QUADS);
+	glTexCoord2d(0.0f, 1.0f);
+	glVertex3f(-dot[0] + (dot[0] * 2), dot[1], 0.0f);
+	glTexCoord2d(0.0f, 0.0f);
+	glVertex3f(-dot[0] + (dot[0] * 2), -dot[1], 0.0f);
+	glTexCoord2d(1.0f, 0.0f);
+	glVertex3f(dot[0] + (dot[0] * 2), -dot[1], 0.0f);
+	glTexCoord2d(1.0f, 1.0f);
+	glVertex3f(dot[0] + (dot[0] * 2), dot[1], 0.0f);
+	glEnd();
+	//bottom
+	glBegin(GL_QUADS);
+	glTexCoord2d(0.0f, 1.0f);
+	glVertex3f(-dot[0], dot[1]+ (dot[1]*2), 0.0f);
+	glTexCoord2d(0.0f, 0.0f);
+	glVertex3f(-dot[0], -dot[1]+ (dot[1] * 2), 0.0f);
+	glTexCoord2d(1.0f, 0.0f);
+	glVertex3f(dot[0], -dot[1]+ (dot[1] * 2), 0.0f);
+	glTexCoord2d(1.0f, 1.0f);
+	glVertex3f(dot[0] , dot[1]+ (dot[1] * 2), 0.0f);
 	glEnd();
 }
 
@@ -674,18 +735,25 @@ void DrawSettledPixels() {
 				glBindTexture(GL_TEXTURE_2D, yellow_texture);
 				drawSettledPixel();
 			}
-			if (temp->data[col] == DOT) {
+			else if (temp->data[col] == DOT) {
 				glLoadIdentity();
 				glTranslatef((0.05f * (col - 4)) - 0.025f, stackbottom + (0.05f * row) - 0.025f, -1.0f);
 				glScalef(0.1f, 0.1f, 0.1f);
 				glBindTexture(GL_TEXTURE_2D, red_texture);
 				drawSettledPixel();
 			}
-			if (temp->data[col] == LINE) {
+			else if (temp->data[col] == LINE) {
 				glLoadIdentity();
 				glTranslatef((0.05f * (col - 4)) - 0.025f, stackbottom + (0.05f * row) - 0.025f, -1.0f);
 				glScalef(0.1f, 0.1f, 0.1f);
 				glBindTexture(GL_TEXTURE_2D, cyan_texture);
+				drawSettledPixel();
+			}
+			else if(temp->data[col] == T) {
+				glLoadIdentity();
+				glTranslatef((0.05f * (col - 4)) - 0.025f, stackbottom + (0.05f * row) - 0.025f, -1.0f);
+				glScalef(0.1f, 0.1f, 0.1f);
+				glBindTexture(GL_TEXTURE_2D, orange_texture);
 				drawSettledPixel();
 			}
 		}
@@ -716,6 +784,16 @@ bool checkFit(int arr1[], int arr2[]) {
 }
 
 	 
+void DeleteAllNodesofLinkedList() {
+	struct node *temp = list;
+	while (list != NULL) {
+		struct node* temp = list;
+		list = temp->next;
+		free(temp);
+		list = list->next;
+	}
+}
+
 struct node* addShapeToList(int shape[]){
 	bool checkFit(int arr1[],int arr2[]);
 	if (list == NULL) {
@@ -766,12 +844,15 @@ struct node* checkForCompletedrowAndDelete() {
 			score += 10;
 			if (score % 50 == 0) {
 				level += 1;
+				delayms -= 30;
 			}
 			list = temp->next;
 			free(temp);
 			temp = list;
 			for (int i = 0; i < 10; i++) {
-				bot[i] = bot[i] - (0.025f);
+				if (bot[i] >= -7 * 0.05f) {
+					bot[i] = bot[i] - (0.025f);
+				}
 			}
 		}
 		else if (temp->next != NULL && allFilled(temp->next->data)) {
@@ -783,7 +864,9 @@ struct node* checkForCompletedrowAndDelete() {
 			temp->next = nodeToDelete->next;
 			free(nodeToDelete);
 			for (int i = 0; i < 10; i++) {
-				bot[i] = bot[i] - (0.025f);
+				if (bot[i] >= -7 * 0.05f) {
+					bot[i] = bot[i] - (0.025f);
+				}
 			}
 		}
 		temp = temp->next;
@@ -808,9 +891,11 @@ void update(void) {
 	struct node* addShapeToList(int shape[]);
 	int shapeArray[10] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
 	//delay to get grid to grid transition effect
-	delay(400);
+	delay(delayms);
 	if (CheckIfOver()) {
 		over = true;
+		PlaySound(NULL, 0, 0);
+		PlaySound(MAKEINTRESOURCE(MYBUZZER), GetModuleHandle(NULL), SND_RESOURCE | SND_ASYNC);
 	}
 	else {
 		switch (currentShape) {
@@ -818,7 +903,7 @@ void update(void) {
 			if (shapePositionY > bot[x] && falling == false) {
 				falling = true;
 				//nextShape = 1;
-				nextShape = rand() % 3;
+				nextShape = rand() % 4;
 			}
 			else if (shapePositionY > bot[x] && shapePositionY > bot[x + 1]) {
 				shapePositionY = shapePositionY - distance;
@@ -839,7 +924,7 @@ void update(void) {
 		case DOT:
 			if (shapePositionY > bot[x] && falling == false) {
 				falling = true;
-				nextShape = rand() % 3;
+				nextShape = rand() % 4;
 			}
 			else if (shapePositionY > bot[x]) {
 				shapePositionY = shapePositionY - distance;
@@ -854,7 +939,7 @@ void update(void) {
 		case LINE:
 			if (shapePositionY > (bot[x] + 0.05) && falling == false) {
 				falling = true;
-				nextShape = rand() % 3;
+				nextShape = rand() % 4;
 			}
 			else if (shapePositionY > (bot[x] + 0.05)) {
 				shapePositionY = shapePositionY - distance;
@@ -877,6 +962,32 @@ void update(void) {
 					bot[x] = bot[x] + (2 * 0.025f);
 				}
 
+			}
+			break;
+		case T:
+			if (shapePositionY > bot[x] && falling == false) {
+				falling = true;
+				//nextShape = 1;
+				nextShape = rand() % 4;
+			}
+			else if (shapePositionY > bot[x] && shapePositionY > bot[x + 1]) {
+				shapePositionY = shapePositionY - distance;
+				fprintf(gpFile, "falling\n");
+			}
+			else if ((shapePositionY <= bot[x] || shapePositionY <= bot[x + 1]) && falling == true) {
+				//modify bottom of every column upto which the shape should fall
+				fprintf(gpFile, "adding shape to list\n");
+				shapeArray[x-1] = currentShape;
+				shapeArray[x] = currentShape;
+				shapeArray[x + 1] = currentShape;
+				list = addShapeToList(shapeArray);
+				shapeArray[x - 1] = -1;
+				shapeArray[x + 1] = -1;
+				list = addShapeToList(shapeArray);
+				bot[x-1] = bot[x-1] + (2 * 0.05f);
+				bot[x] = bot[x] + (2 * 0.05f);
+				bot[x + 1] = bot[x + 1] + (2 * 0.05f);
+				falling = false;
 			}
 			break;
 		}
@@ -905,6 +1016,10 @@ void update(void) {
 				shapePositionX = 0.0f - 0.025f;
 				shapeWidth = ln[0];
 				shapeHeight = ln[1];
+			}
+			if (currentShape == T) {
+				shapePositionY = top + 0.075f;
+				shapePositionX = 0.0f - 0.025f;
 			}
 		}
 	}
